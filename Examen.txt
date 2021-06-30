@@ -1,0 +1,418 @@
+Models: IdentityModels.cs
+
+using System.Data.Entity;
+using System.Security.Claims;
+using System.Threading.Tasks;
+using Microsoft.AspNet.Identity;
+using Microsoft.AspNet.Identity.EntityFramework;
+
+namespace Examen.Models
+{
+    // You can add profile data for the user by adding more properties to your ApplicationUser class, please visit https://go.microsoft.com/fwlink/?LinkID=317594 to learn more.
+    public class ApplicationUser : IdentityUser
+    {
+        public async Task<ClaimsIdentity> GenerateUserIdentityAsync(UserManager<ApplicationUser> manager)
+        {
+            // Note the authenticationType must match the one defined in CookieAuthenticationOptions.AuthenticationType
+            var userIdentity = await manager.CreateIdentityAsync(this, DefaultAuthenticationTypes.ApplicationCookie);
+            // Add custom user claims here
+            return userIdentity;
+        }
+    }
+
+    public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
+    {
+        public ApplicationDbContext()
+            : base("DefaultConnection", throwIfV1Schema: false)
+        {
+            Database.SetInitializer<ApplicationDbContext>(new Initializare());
+        }
+
+        public DbSet<Poezie> Poezii { get; set; }
+        public DbSet<Volum> Volume { get; set; }
+        public static ApplicationDbContext Create()
+        {
+            return new ApplicationDbContext();
+        }
+
+        public class Initializare : DropCreateDatabaseAlways<ApplicationDbContext>
+        {
+            protected override void Seed(ApplicationDbContext ctx)
+            {
+                
+                Volum volum1 = new Volum { Id = 1, Denumire = "Poezii Blaga" };
+                Volum volum2 = new Volum { Id = 2, Denumire = "Poezii Arghezi" };
+                Volum volum3 = new Volum { Id = 3, Denumire = "Poezii Eminescu" };
+
+                ctx.Volume.Add(volum1);
+                ctx.Volume.Add(volum2);
+                ctx.Volume.Add(volum3);
+
+                Poezie poezie1 = new Poezie { PoezieId = 1, Titlu = "Amurg de toamnă", Autor = "Blaga", NumarStrofe = 5, Volum = volum1};
+                Poezie poezie2 = new Poezie { PoezieId = 2, Titlu = "Luceafarul", Autor = "Eminescu", NumarStrofe = 98, Volum = volum3 };
+                Poezie poezie3 = new Poezie { PoezieId = 3, Titlu = "Floare Albastra", Autor = "Eminescu", NumarStrofe = 4, Volum = volum3};
+                Poezie poezie4 = new Poezie { PoezieId = 4, Titlu = "Flori de mucigai", Autor = "Arghezi", NumarStrofe = 5, Volum = volum2 };
+                Poezie poezie5 = new Poezie { PoezieId = 5, Titlu = "Testament", Autor = "Arghezi", NumarStrofe = 5 , Volum = volum2};
+                Poezie poezie6 = new Poezie { PoezieId = 1, Titlu = "Eu nu strivesc corola de minuni a lumii", Autor = "Blaga", NumarStrofe = 5 , Volum = volum1};
+
+                ctx.Poezii.Add(poezie1);
+                ctx.Poezii.Add(poezie2);
+                ctx.Poezii.Add(poezie3);
+                ctx.Poezii.Add(poezie4);
+                ctx.Poezii.Add(poezie5);
+                ctx.Poezii.Add(poezie6);
+
+                ctx.SaveChanges();
+                base.Seed(ctx);
+
+            }
+        }
+    }
+}
+
+Models: Poezie.cs
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations;
+using System.Web.Mvc;
+
+namespace Examen.Models
+{
+    public class Poezie
+    {
+        [Key]
+        public int PoezieId { get; set; }
+       [Required]
+        public string Titlu { get; set; }
+        [Required]
+        public string Autor { get; set; }
+        [Required]
+        public int NumarStrofe { get; set; }
+
+        //one-to-many
+        [ForeignKey("Volum")]
+        public int VolumId { get; set; }
+        public Volum Volum { get; set; }
+
+        public IEnumerable<SelectListItem> VolumeList { get; set; }
+    }
+}
+
+Models: Volum.cs
+
+using System.Linq;
+using System.Web;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations;
+using System.Web.Mvc;
+using System.Collections.Generic;
+
+namespace Examen.Models
+{
+    public class Volum
+    {
+        [Key]
+        public int Id { get; set; }
+        [Required]
+        public string Denumire { get; set; }
+
+        //one-to-many
+        public virtual ICollection<Poezie> Poezie { get; set; }
+
+    }
+}
+Controllers: VolumController.cs
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+using System.Web.Mvc;
+using Examen.Models;
+
+namespace Examen.Controllers
+{
+    public class VolumController : Controller
+    {
+        private ApplicationDbContext db = new ApplicationDbContext();
+        // GET: Volum
+        public ActionResult Index()
+        {
+            return View();
+        }
+    }
+}
+
+Controllers: PoezieController.cs
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+using System.Web.Mvc;
+using Examen.Models;
+
+namespace Examen.Controllers
+{
+    public class PoezieController : Controller
+    {
+        private ApplicationDbContext db = new ApplicationDbContext();
+        // GET: Poezie
+        public ActionResult Index()
+        {
+            List<Poezie> poezii = db.Poezii.ToList();
+            ViewBag.Poezii = poezii;
+            return View();
+        }
+
+        [NonAction]
+        public IEnumerable<SelectListItem> GetAllVolume()
+        {
+            var selectList = new List<SelectListItem>();
+            foreach (var volum in db.Volume.ToList())
+            {
+                selectList.Add(new SelectListItem
+                {
+                    Value = volum.Id.ToString(),
+                    Text = volum.Denumire
+                });
+            }
+            return selectList;
+        }
+
+
+        [HttpGet]
+        public ActionResult Create()
+        {
+            Poezie poezie = new Poezie();
+            poezie.VolumeList = GetAllVolume();
+            return View(poezie);
+        }
+
+        [HttpPost]
+        public ActionResult Create(Poezie poezieRequest)
+        {
+            try
+            {
+                poezieRequest.VolumeList = GetAllVolume();
+                if (ModelState.IsValid)
+                {
+                    db.Poezii.Add(poezieRequest);
+                    db.SaveChanges();
+                    return RedirectToAction("Index");
+                }
+                return View(poezieRequest);
+            }
+            catch (Exception e)
+            {
+                return View(poezieRequest);
+            }
+        }
+
+         [HttpGet]
+         public ActionResult Update(int? id)
+         {
+             if (id.HasValue)
+             {
+                 Poezie poezie = db.Poezii.Find(id);
+                 if (poezie == null)
+                 {
+                     return HttpNotFound("Nu s-a gasit id-ul " + id.ToString());
+                 }
+                 poezie.VolumeList = GetAllVolume();
+                 return View(poezie);
+             }
+             return HttpNotFound("Lipseste id-ul poeziei");
+         }
+
+         [HttpPut]
+         public ActionResult Update(int id, Poezie poezieRequest)
+         {
+             Poezie poezie = db.Poezii.SingleOrDefault(b => b.PoezieId.Equals(id));
+             try
+             {
+                 poezieRequest.VolumeList = GetAllVolume();
+                 if (ModelState.IsValid)
+                 {
+                     if (TryUpdateModel(poezie))
+                     {
+                        poezie.Titlu = poezieRequest.Titlu;
+                        poezie.Autor = poezieRequest.Autor;
+                        poezie.NumarStrofe = poezieRequest.NumarStrofe;
+                         db.SaveChanges();
+                     }
+                     return RedirectToAction("Index");
+                 }
+                 return View(poezieRequest);
+             }
+             catch (Exception e)
+             {
+                 return View(poezieRequest);
+             }
+         }
+
+         public ActionResult Delete(int id)
+         {
+             Poezie poezie = db.Poezii.Find(id);
+             if (poezie != null)
+             {
+                 db.Poezii.Remove(poezie);
+                 db.SaveChanges();
+                 return RedirectToAction("Index");
+             }
+             return HttpNotFound("Nu s-a putut gasi poezia cu id-ul " + id.ToString());
+         }
+
+    }
+
+}
+
+Views: Poezie: Create.cshtml
+
+
+@model Examen.Models.Poezie
+
+@{
+    ViewBag.Title = "Create";
+}
+
+<h2>Create</h2>
+
+@using (Html.BeginForm(actionName: "Create", controllerName: "Poezie", method: FormMethod.Post))
+{
+    @Html.Label("PoezieId", "Id Poezie:")
+    <br />
+    @Html.TextBoxFor(b => b.PoezieId, null, new { placeholder = "Introdu id-ul poeziei", @class = "form-control" })
+    @Html.ValidationMessageFor(b => b.PoezieId, "", new { @class = "text-danger" })
+    <br />
+
+    @Html.Label("Titlu", "Titlu:")
+    <br />
+    @Html.TextBoxFor(b => b.Titlu, null, new { placeholder = "Introdu titlul poeziei", @class = "form-control" })
+    @Html.ValidationMessageFor(b => b.Titlu, "", new { @class = "text-danger" })
+    <br />
+
+    @Html.Label("Autor", "Autor:")
+    <br />
+    @Html.TextBoxFor(b => b.Autor, null, new { placeholder = "Introdu autorul poeziei", @class = "form-control" })
+    @Html.ValidationMessageFor(b => b.Autor, "", new { @class = "text-danger" })
+    <br />
+
+    @Html.Label("NumarStrofe", "Numar Strofe:")
+    <br />
+    @Html.TextBoxFor(b => b.NumarStrofe, null, new { placeholder = "Introdu numarul de strofe", @class = "form-control" })
+    @Html.ValidationMessageFor(b => b.NumarStrofe, "", new { @class = "text-danger" })
+    <br />
+
+    @Html.Label("Volum", "VolumId:")
+    <br />
+    @Html.DropDownListFor(b => b.VolumId, new SelectList(Model.VolumeList, "Value", "Text"), "Alege un volum", new { @class = "form-control" })
+    @Html.ValidationMessageFor(b => b.VolumId, "", new { @class = "text-danger" })
+    <br />
+    <br />
+    <br />
+
+    <button class="btn btn-primary" type="submit">Create</button>
+}
+
+
+Views: Poezie: Delete.cshtml
+
+
+@{
+    ViewBag.Title = "Delete";
+}
+
+<h2>Delete</h2>
+
+
+Views: Poezie: Index.cshtml
+
+@{ ViewBag.Title = "Index"; }
+
+<h2>Index</h2>
+
+@foreach (var poezie in ViewBag.Poezii)
+{
+
+
+    <div class="panel panel-default">
+        <div class="panel-body">
+            @Html.Label("PoezieId", "Id:")
+            <br />
+            <p>@poezie.PoezieId</p>
+
+            @Html.Label("Titlu", "Titlu:")
+            <br />
+            <p>@poezie.Titlu</p>
+
+            @Html.Label("Autor", "Autor:")
+            <br />
+            <p>@poezie.Autor</p>
+
+            @Html.Label("NumarStrofe", "Numar Strofe:")
+            <br />
+            <p>@poezie.NumarStrofe</p>
+
+        </div>
+    </div>
+}
+
+<button>@Html.ActionLink("Adauga Volum", "Create")</button>
+
+
+Views: Poezie: Update.cshtml
+
+
+@model Examen.Models.Poezie
+
+@{
+    ViewBag.Title = "Update";
+}
+
+<h2>Update</h2>
+
+
+@using (Html.BeginForm(actionName: "Update", controllerName: "Poezie"))
+{
+    @Html.HttpMethodOverride(HttpVerbs.Put)
+
+    @Html.HiddenFor(b => b.PoezieId)
+    <br />
+
+    @Html.Label("Titlu", "Titlu: ")
+    <br />
+    @Html.EditorFor(b => b.Titlu, new { htmlAttributes = new { @class = "form-control" } })
+    @Html.ValidationMessageFor(b => b.Titlu, "", new { @class = "text-danger" })
+    <br />
+    <br />
+
+
+    @Html.Label("Autor", "Autor: ")
+    <br />
+    @Html.EditorFor(b => b.Autor, new { htmlAttributes = new { @class = "form-control" } })
+    @Html.ValidationMessageFor(b => b.Autor, "", new { @class = "text-danger" })
+    <br />
+
+    @Html.Label("NumarStrofe", "Numar Strofe: ")
+    <br />
+    @Html.EditorFor(b => b.NumarStrofe, new { htmlAttributes = new { @class = "form-control" } })
+    @Html.ValidationMessageFor(b => b.NumarStrofe, "", new { @class = "text-danger" })
+    <br />
+
+
+    @Html.Label("VolumId", "Volum:")
+    <br />
+    @Html.DropDownListFor(b => b.VolumId, new SelectList(Model.VolumeList, "Value", "Text"), "Alege un volum", new { @class = "form-control" })
+    @Html.ValidationMessageFor(b => b.VolumId, "", new { @class = "text-danger" })
+    <br />
+    <br />
+
+    <button class="btn btn-primary" type="submit"> Update</button>
+}
+
+	
